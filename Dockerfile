@@ -1,14 +1,12 @@
-FROM python:3.11-slim
+FROM node:20-bullseye-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    nodejs \
-    npm \
     curl \
     wget \
+    python3 \
+    && pip3 install yt-dlp --break-system-packages \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip install openai-whisper yt-dlp --break-system-packages
 
 WORKDIR /app
 
