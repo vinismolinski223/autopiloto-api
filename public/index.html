@@ -3,81 +3,95 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crime Oculto BR — Gerador de Shorts</title>
+<title>ClipForge — Cortes Automáticos de Podcast</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #080810; color: #e2e2e2; font-family: 'Inter', sans-serif; min-height: 100vh; padding: 28px 16px; }
-  .container { max-width: 720px; margin: 0 auto; }
+  body { background: #0a0a0f; color: #e2e2e2; font-family: 'Inter', sans-serif; min-height: 100vh; padding: 28px 16px; }
+  .container { max-width: 760px; margin: 0 auto; }
   .header { text-align: center; margin-bottom: 32px; }
-  .label { font-size: 11px; letter-spacing: 5px; color: #ef4444; text-transform: uppercase; margin-bottom: 6px; }
-  h1 { font-size: 36px; font-weight: 900; background: linear-gradient(135deg, #ef4444, #dc2626); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .label { font-size: 11px; letter-spacing: 5px; color: #6366f1; text-transform: uppercase; margin-bottom: 6px; }
+  h1 { font-size: 36px; font-weight: 900; background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   .subtitle { color: #4b5563; margin-top: 6px; font-size: 13px; }
   .badges { display: flex; justify-content: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-  .badge { font-size: 10px; background: #111118; border: 1px solid #1e1e2e; border-radius: 20px; padding: 3px 10px; color: #ef4444; }
+  .badge { font-size: 10px; background: #111118; border: 1px solid #1e1e2e; border-radius: 20px; padding: 3px 10px; color: #6366f1; }
   .card { background: #111118; border: 1px solid #1e1e2e; border-radius: 16px; padding: 22px; margin-bottom: 14px; }
-  .card-title { font-size: 11px; color: #ef4444; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
-  .casos { display: grid; grid-template-columns: 1fr; gap: 8px; }
-  .caso-btn { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 10px; padding: 12px 16px; color: #6b7280; font-size: 13px; cursor: pointer; text-align: left; line-height: 1.5; transition: all 0.2s; }
-  .caso-btn:hover, .caso-btn.ativo { background: #1a0a0a; border-color: #ef4444; color: #fca5a5; }
-  .caso-custom { }
-  input { width: 100%; background: #0d0d14; border: 1px solid #ef4444; border-radius: 10px; padding: 12px 14px; color: #e2e2e2; font-size: 13px; outline: none; margin-top: 10px; }
-  .btn-gerar { width: 100%; padding: 16px; background: linear-gradient(135deg, #dc2626, #991b1b); border: none; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
+  .card-title { font-size: 11px; color: #818cf8; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+  .input-url { width: 100%; background: #0d0d14; border: 1px solid #6366f1; border-radius: 10px; padding: 14px 16px; color: #e2e2e2; font-size: 14px; outline: none; }
+  .podcasts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .podcast-btn { background: #0d0d14; border: 1px solid #1e1e2e; border-radius: 10px; padding: 10px 12px; color: #6b7280; font-size: 12px; cursor: pointer; text-align: left; transition: all 0.2s; }
+  .podcast-btn:hover { border-color: #6366f1; color: #a5b4fc; }
+  .btn-gerar { width: 100%; padding: 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; border-radius: 12px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 20px; }
   .btn-gerar:disabled { background: #1e1e2e; color: #4b5563; cursor: not-allowed; }
-  .processando { background: #111118; border: 1px solid #ef444444; border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 16px; display: none; }
-  .timer { font-size: 28px; font-weight: 800; color: #ef4444; }
-  .dica { margin-top: 20px; background: #0d0d14; border-radius: 10px; padding: 12px; font-size: 12px; color: #4b5563; }
+  .processando { background: #111118; border: 1px solid #6366f133; border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 16px; display: none; }
+  .timer { font-size: 28px; font-weight: 800; color: #6366f1; }
+  .steps { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; text-align: left; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #4b5563; padding: 8px 12px; background: #0d0d14; border-radius: 8px; }
+  .step.ativo { color: #a5b4fc; }
+  .step.done { color: #4ade80; }
   .erro { background: #7f1d1d22; border: 1px solid #ef444444; border-radius: 12px; padding: 16px; margin-bottom: 14px; color: #f87171; font-size: 13px; display: none; }
-  .sucesso { background: #1a0a0a; border: 1px solid #ef444444; border-radius: 16px; padding: 22px; text-align: center; margin-bottom: 16px; }
-  .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-  .btn-acao { flex: 1; min-width: 140px; border-radius: 10px; padding: 14px 20px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; border: none; }
-  .btn-download { background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; }
-  .btn-sec { background: #111118; border: 1px solid #1e1e2e; color: #9ca3af; }
-  video { width: 100%; max-width: 400px; border-radius: 14px; margin: 0 auto 14px; display: block; }
-  .roteiro-box { background: #111118; border: 1px solid #1e1e2e; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
-  .roteiro-texto { font-size: 12px; color: #9ca3af; line-height: 1.8; max-height: 150px; overflow-y: auto; }
+  .cortes-grid { display: grid; gap: 16px; margin-bottom: 16px; }
+  .corte-card { background: #111118; border: 1px solid #1e1e2e; border-radius: 14px; overflow: hidden; }
+  .corte-header { padding: 14px 16px; border-bottom: 1px solid #1e1e2e; }
+  .corte-num { font-size: 10px; color: #6366f1; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .corte-titulo { font-size: 14px; font-weight: 700; color: #e2e2e2; margin-top: 4px; }
+  .corte-info { font-size: 11px; color: #4b5563; margin-top: 4px; }
+  .corte-video { width: 100%; max-width: 300px; display: block; margin: 0 auto; }
+  .corte-body { padding: 14px 16px; }
+  .corte-desc { font-size: 12px; color: #6b7280; line-height: 1.6; margin-bottom: 12px; }
+  .corte-acoes { display: flex; gap: 8px; }
+  .btn-sm { flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; border: none; }
+  .btn-dl { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+  .btn-copy { background: #1e1e2e; color: #9ca3af; border: 1px solid #374151; }
+  .sucesso-header { background: #14532d22; border: 1px solid #16a34a44; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 16px; }
+  .btn-novo { width: 100%; padding: 14px; background: #111118; border: 1px solid #1e1e2e; border-radius: 12px; color: #6b7280; font-size: 14px; cursor: pointer; margin-bottom: 20px; }
   .footer { text-align: center; font-size: 10px; color: #1f2937; margin-top: 8px; }
-  .stats { display: flex; gap: 16px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
-  .stat { font-size: 12px; color: #6b7280; }
-  .stat span { color: #ef4444; font-weight: 700; }
+  .dica { margin-top: 16px; background: #0d0d14; border-radius: 10px; padding: 12px; font-size: 12px; color: #4b5563; }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <div class="label">True Crime BR</div>
-    <h1>Crime Oculto</h1>
-    <p class="subtitle">Escolha o caso → receba o Short pronto pra postar</p>
+    <div class="label">Gerador de Cortes</div>
+    <h1>ClipForge</h1>
+    <p class="subtitle">Cole o link → receba 5 Shorts prontos pra postar</p>
     <div class="badges">
+      <span class="badge">yt-dlp</span>
+      <span class="badge">Whisper AI</span>
       <span class="badge">Claude</span>
-      <span class="badge">ElevenLabs</span>
-      <span class="badge">Kling 3.0</span>
+      <span class="badge">FFmpeg</span>
       <span class="badge">9:16 Vertical</span>
     </div>
   </div>
 
-  <div id="seletor" class="card">
-    <div class="card-title">Escolha o caso</div>
-    <div class="casos">
-      <button class="caso-btn" onclick="selecionar(this,'Telexfree: o maior esquema Ponzi do Brasil que destruiu famílias inteiras')">🔴 Telexfree: o maior esquema Ponzi do Brasil</button>
-      <button class="caso-btn" onclick="selecionar(this,'O golpe do PIX: como criminosos roubam dinheiro em segundos e somem')">🔴 O golpe do PIX que ninguém te contou</button>
-      <button class="caso-btn" onclick="selecionar(this,'Lava Jato: como bilhões foram desviados da Petrobras por anos')">🔴 Lava Jato: os bilhões desviados da Petrobras</button>
-      <button class="caso-btn" onclick="selecionar(this,'Hackers brasileiros: o grupo que invadiu bancos e roubou milhões')">🔴 Hackers brasileiros que roubaram milhões de bancos</button>
-      <button class="caso-btn" onclick="selecionar(this,'O golpe da falsa herança: como estelionatários enganam idosos no Brasil')">🔴 O golpe da falsa herança que destrói aposentados</button>
-      <button class="caso-btn" onclick="selecionar(this,'Dados na dark web: como suas informações pessoais são vendidas por criminosos')">🔴 Seus dados estão sendo vendidos na dark web agora</button>
-      <button class="caso-btn caso-custom" onclick="mostrarCustom(this)">✏️ Digitar caso personalizado</button>
+  <div id="seletor">
+    <div class="card">
+      <div class="card-title">Cole o link do vídeo ou podcast</div>
+      <input type="text" class="input-url" id="url-input" placeholder="https://www.youtube.com/watch?v=..." oninput="urlInput(this.value)">
+      <div style="margin-top:12px;font-size:11px;color:#4b5563;">Ou escolha um podcast popular:</div>
+      <div class="podcasts">
+        <button class="podcast-btn" onclick="colarUrl('https://www.youtube.com/@FlowPodcast')">🎙️ Flow Podcast</button>
+        <button class="podcast-btn" onclick="colarUrl('https://www.youtube.com/@podpah')">🎙️ Podpah</button>
+        <button class="podcast-btn" onclick="colarUrl('https://www.youtube.com/@InteligenciaLtda')">🎙️ Inteligência Ltda</button>
+        <button class="podcast-btn" onclick="colarUrl('https://www.youtube.com/@PrimoCast')">🎙️ Primo Cast</button>
+      </div>
     </div>
-    <input type="text" id="custom-input" placeholder="Ex: O esquema que fraudou o INSS por anos..." style="display:none" oninput="customInput(this.value)">
+
+    <button class="btn-gerar" id="btn-gerar" onclick="gerar()" disabled>✂️ Gerar 5 Cortes Agora</button>
   </div>
 
-  <button class="btn-gerar" id="btn-gerar" onclick="gerar()" disabled>🎬 Gerar Short Agora</button>
-
   <div class="processando" id="processando">
-    <div style="font-size:40px;margin-bottom:12px">🎬</div>
-    <div style="font-weight:700;font-size:16px;color:#ef4444;margin-bottom:8px">Gerando seu Short...</div>
-    <div style="font-size:13px;color:#4b5563;margin-bottom:16px">Roteiro → Narração → Clipes Kling 3.0 → Montagem 9:16</div>
+    <div style="font-size:36px;margin-bottom:12px">✂️</div>
+    <div style="font-weight:700;font-size:16px;color:#a5b4fc;margin-bottom:8px">Gerando seus cortes...</div>
     <div class="timer" id="timer">0:00</div>
     <div style="font-size:11px;color:#374151;margin-top:4px">tempo decorrido</div>
-    <div class="dica">Gerando até 10 clipes cinematográficos sombrios. Leva ~15 minutos. Pode deixar aberto!</div>
+    <div class="steps">
+      <div class="step" id="step1">⬇️ Baixando vídeo...</div>
+      <div class="step" id="step2">🎙️ Transcrevendo áudio com Whisper...</div>
+      <div class="step" id="step3">🤖 Claude analisando melhores momentos...</div>
+      <div class="step" id="step4">✂️ Cortando e formatando 9:16...</div>
+      <div class="step" id="step5">📦 Preparando seus 5 cortes...</div>
+    </div>
+    <div class="dica">Leva 10-20 minutos dependendo do tamanho do vídeo. Pode deixar aberto!</div>
   </div>
 
   <div class="erro" id="erro-box">
@@ -86,109 +100,125 @@
   </div>
 
   <div id="resultado" style="display:none">
-    <div class="sucesso">
-      <div style="font-size:32px;margin-bottom:8px">🎬</div>
-      <div style="font-weight:700;font-size:18px;color:#ef4444;margin-bottom:8px">Short pronto!</div>
-      <div class="stats">
-        <div class="stat">Duração: <span id="info-duracao"></span></div>
-        <div class="stat">Tamanho: <span id="info-tamanho"></span></div>
-        <div class="stat">Clipes: <span id="info-clipes"></span></div>
-        <div class="stat">Tempo: <span id="info-tempo"></span></div>
-      </div>
+    <div class="sucesso-header">
+      <div style="font-size:28px;margin-bottom:6px">🎬</div>
+      <div style="font-weight:700;font-size:16px;color:#4ade80;margin-bottom:4px" id="sucesso-titulo"></div>
+      <div style="font-size:12px;color:#6b7280" id="sucesso-info"></div>
     </div>
-    <video id="player" controls></video>
-    <div class="roteiro-box">
-      <div class="card-title">Roteiro</div>
-      <div class="roteiro-texto" id="roteiro-txt"></div>
-    </div>
-    <div class="acoes">
-      <a id="btn-dl" href="#" download="crime-oculto-short.mp4" class="btn-acao btn-download">⬇️ Baixar Short MP4</a>
-      <button onclick="copiar()" class="btn-acao btn-sec" style="border:1px solid #1e1e2e">📋 Copiar roteiro</button>
-      <button onclick="reiniciar()" class="btn-acao btn-sec" style="border:1px solid #1e1e2e">🔄 Novo caso</button>
-    </div>
+    <div class="cortes-grid" id="cortes-grid"></div>
+    <button class="btn-novo" onclick="reiniciar()">🔄 Gerar cortes de outro vídeo</button>
   </div>
 
-  <div class="footer">Crime Oculto BR · Claude + ElevenLabs + Kling 3.0 · Powered by AutoPiloto</div>
+  <div class="footer">ClipForge · yt-dlp + Whisper + Claude + FFmpeg · by AutoPiloto</div>
 </div>
 
 <script>
-let tema = "", seg = 0, iv = null, roteiro = "";
+let urlAtual = "", seg = 0, iv = null;
 
-function selecionar(btn, t) {
-  document.querySelectorAll(".caso-btn").forEach(b => b.classList.remove("ativo"));
-  btn.classList.add("ativo");
-  document.getElementById("custom-input").style.display = "none";
-  tema = t;
-  document.getElementById("btn-gerar").disabled = false;
-}
-
-function mostrarCustom(btn) {
-  document.querySelectorAll(".caso-btn").forEach(b => b.classList.remove("ativo"));
-  btn.classList.add("ativo");
-  document.getElementById("custom-input").style.display = "block";
-  tema = "";
-  document.getElementById("btn-gerar").disabled = true;
-}
-
-function customInput(v) {
-  tema = v;
+function urlInput(v) {
+  urlAtual = v;
   document.getElementById("btn-gerar").disabled = !v.trim();
+}
+
+function colarUrl(url) {
+  document.getElementById("url-input").value = url;
+  urlAtual = url;
+  document.getElementById("btn-gerar").disabled = false;
 }
 
 function fmt(s) { return Math.floor(s/60)+":"+(s%60).toString().padStart(2,"0"); }
 
+function ativarStep(n) {
+  for(let i=1;i<=5;i++) {
+    const el = document.getElementById(`step${i}`);
+    if(i < n) el.className = "step done";
+    else if(i === n) el.className = "step ativo";
+    else el.className = "step";
+  }
+}
+
 async function gerar() {
-  if (!tema.trim()) return;
+  if (!urlAtual.trim()) return;
   document.getElementById("seletor").style.display = "none";
-  document.getElementById("btn-gerar").style.display = "none";
   document.getElementById("processando").style.display = "block";
   document.getElementById("erro-box").style.display = "none";
   document.getElementById("resultado").style.display = "none";
+
   seg = 0;
-  iv = setInterval(() => { seg++; document.getElementById("timer").textContent = fmt(seg); }, 1000);
+  iv = setInterval(() => {
+    seg++;
+    document.getElementById("timer").textContent = fmt(seg);
+    // Atualizar steps baseado no tempo
+    if(seg < 60) ativarStep(1);
+    else if(seg < 180) ativarStep(2);
+    else if(seg < 240) ativarStep(3);
+    else if(seg < 600) ativarStep(4);
+    else ativarStep(5);
+  }, 1000);
 
   try {
-    const res = await fetch("/gerar-video", {
+    const res = await fetch("/gerar-cortes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tema })
+      body: JSON.stringify({ url: urlAtual })
     });
     const data = await res.json();
     clearInterval(iv);
-    if (!data.sucesso) throw new Error(data.erro || "Erro ao gerar Short");
 
-    const bytes = Uint8Array.from(atob(data.videoBase64), c => c.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
-    document.getElementById("player").src = url;
-    document.getElementById("btn-dl").href = url;
-    document.getElementById("roteiro-txt").textContent = data.roteiro;
-    document.getElementById("info-duracao").textContent = fmt(data.duracaoSegundos);
-    document.getElementById("info-tamanho").textContent = data.tamanhoMB + "MB";
-    document.getElementById("info-clipes").textContent = data.clipesGerados + " clipes";
-    document.getElementById("info-tempo").textContent = fmt(seg);
-    roteiro = data.roteiro;
+    if (!data.sucesso) throw new Error(data.erro || "Erro ao gerar cortes");
+
+    // Montar resultado
+    document.getElementById("sucesso-titulo").textContent = `${data.totalCortes} cortes prontos!`;
+    document.getElementById("sucesso-info").textContent = `"${data.tituloOriginal}" · ${fmt(data.duracaoOriginal)} de duração · processado em ${fmt(seg)}`;
+
+    const grid = document.getElementById("cortes-grid");
+    grid.innerHTML = "";
+
+    data.cortes.forEach((corte, i) => {
+      const bytes = Uint8Array.from(atob(corte.videoBase64), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+
+      const card = document.createElement("div");
+      card.className = "corte-card";
+      card.innerHTML = `
+        <div class="corte-header">
+          <div class="corte-num">Corte ${corte.index} · ${fmt(corte.duracao)} · ${corte.tamanhoMB}MB</div>
+          <div class="corte-titulo">${corte.titulo}</div>
+        </div>
+        <video class="corte-video" controls src="${url}" style="max-height:400px;background:#000"></video>
+        <div class="corte-body">
+          <div class="corte-desc">${corte.descricao}</div>
+          <div class="corte-acoes">
+            <a href="${url}" download="corte_${corte.index}.mp4" class="btn-sm btn-dl">⬇️ Baixar MP4</a>
+            <button onclick="copiarTexto('${corte.titulo}\\n\\n${corte.descricao}')" class="btn-sm btn-copy">📋 Copiar título</button>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
 
     document.getElementById("processando").style.display = "none";
     document.getElementById("resultado").style.display = "block";
+
   } catch(e) {
     clearInterval(iv);
     document.getElementById("processando").style.display = "none";
     document.getElementById("erro-msg").textContent = e.message;
     document.getElementById("erro-box").style.display = "block";
     document.getElementById("seletor").style.display = "block";
-    document.getElementById("btn-gerar").style.display = "block";
   }
 }
 
-function copiar() { navigator.clipboard.writeText(roteiro); alert("Roteiro copiado!"); }
+function copiarTexto(texto) {
+  navigator.clipboard.writeText(texto);
+  alert("Copiado!");
+}
 
 function reiniciar() {
-  tema = "";
-  document.querySelectorAll(".caso-btn").forEach(b => b.classList.remove("ativo"));
-  document.getElementById("custom-input").style.display = "none";
-  document.getElementById("seletor").style.display = "block";
-  document.getElementById("btn-gerar").style.display = "block";
+  urlAtual = "";
+  document.getElementById("url-input").value = "";
   document.getElementById("btn-gerar").disabled = true;
+  document.getElementById("seletor").style.display = "block";
   document.getElementById("processando").style.display = "none";
   document.getElementById("erro-box").style.display = "none";
   document.getElementById("resultado").style.display = "none";
