@@ -5,8 +5,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     python3 \
-    && pip3 install yt-dlp --break-system-packages \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install yt-dlp --break-system-packages
 
 WORKDIR /app
 
