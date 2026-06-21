@@ -92,7 +92,8 @@ async function gerarClipe(prompt, index, pasta) {
   );
 
   let prediction = res.data;
-  if (prediction.error) throw new Error(prediction.error);
+  console.log(`Clipe ${index + 1} resposta:`, JSON.stringify(prediction).slice(0, 300));
+  if (prediction.error) throw new Error(`Replicate: ${JSON.stringify(prediction.error)}`);
 
   let tentativas = 0;
   while (prediction.status !== "succeeded" && prediction.status !== "failed" && tentativas < 40) {
@@ -102,10 +103,10 @@ async function gerarClipe(prompt, index, pasta) {
     });
     prediction = poll.data;
     tentativas++;
-    console.log(`Clipe ${index + 1} status: ${prediction.status}`);
+    console.log(`Clipe ${index + 1} status: ${prediction.status} erro: ${prediction.error || "nenhum"}`);
   }
 
-  if (prediction.status !== "succeeded") throw new Error(`Clipe ${index + 1} falhou: ${prediction.error || prediction.status}`);
+  if (prediction.status !== "succeeded") throw new Error(`Clipe ${index + 1} falhou. Status: ${prediction.status}. Erro: ${JSON.stringify(prediction.error)}`);
 
   const clipUrl = prediction.output?.[0] || prediction.output;
   const clipPath = path.join(pasta, `clip_${index}.mp4`);
