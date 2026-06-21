@@ -1,10 +1,11 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const { exec, spawn } = require("child_process");
+const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const FormData = require("form-data");
 
 const app = express();
 app.use(cors());
@@ -18,14 +19,15 @@ app.use(express.static(path.join(__dirname, "public"), {
 const PORT = process.env.PORT || 3000;
 const TMP = "/tmp/clipforge";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+const ASSEMBLYAI_KEY = process.env.ASSEMBLYAI_KEY;
 
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
 
-app.get("/status", (req, res) => res.json({ status: "online", version: "1.0.0" }));
+app.get("/status", (req, res) => res.json({ status: "online", version: "2.0.0" }));
 
-function rodar(comando, opcoes = {}) {
+function rodar(comando) {
   return new Promise((resolve, reject) => {
-    exec(comando, { maxBuffer: 1024 * 1024 * 500, ...opcoes }, (err, stdout, stderr) => {
+    exec(comando, { maxBuffer: 1024 * 1024 * 500 }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || err.message));
       else resolve(stdout);
     });
@@ -39,31 +41,89 @@ async function baixarVideo(url, pasta) {
   return videoPath;
 }
 
-async function transcreverAudio(videoPath, pasta) {
-  console.log("Transcrevendo áudio com Whisper...");
+async function extrairAudio(videoPath, pasta) {
+  console.log("Extraindo áudio...");
   const audioPath = path.join(pasta, "audio.mp3");
   await rodar(`ffmpeg -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 64k "${audioPath}" -y`);
+  return audioPath;
+}
+
+async function transcreverAssemblyAI(audioPath) {
+  console.log("Enviando áudio pro AssemblyAI...");
   
-  const transcricaoPath = path.join(pasta, "transcricao.json");
-  await rodar(`python3 -c "
-import whisper, json
-model = whisper.load_model('base')
-result = model.transcribe('${audioPath}', language='pt', word_timestamps=True)
-with open('${transcricaoPath}', 'w') as f:
-    json.dump(result, f, ensure_ascii=False)
-print('Transcrição concluída!')
-"`);
+  // Upload do arquivo
+  const audioData = fs.readFileSync(audioPath);
+  const uploadRes = await axios.post("https://api.assemblyai.com/v2/upload", audioData, {
+    headers: {
+      "authorization": ASSEMBLYAI_KEY,
+      "content-type": "application/octet-stream",
+    },
+    maxBodyLength: Infinity,
+  });
+  const uploadUrl = uploadRes.data.upload_url;
+  console.log("Áudio enviado! Iniciando transcrição...");
+
+  // Iniciar transcrição
+  const transcricaoRes = await axios.post("https://api.assemblyai.com/v2/transcript", {
+    audio_url: uploadUrl,
+    language_code: "pt",
+    timestamps_type: "word",
+  }, {
+    headers: { "authorization": ASSEMBLYAI_KEY }
+  });
   
-  const transcricao = JSON.parse(fs.readFileSync(transcricaoPath, "utf8"));
-  return transcricao;
+  const transcricaoId = transcricaoRes.data.id;
+  console.log(`Transcrição iniciada: ${transcricaoId}`);
+
+  // Polling até completar
+  let resultado;
+  let tentativas = 0;
+  while (tentativas < 120) {
+    await new Promise(r => setTimeout(r, 5000));
+    const statusRes = await axios.get(`https://api.assemblyai.com/v2/transcript/${transcricaoId}`, {
+      headers: { "authorization": ASSEMBLYAI_KEY }
+    });
+    resultado = statusRes.data;
+    console.log(`Transcrição status: ${resultado.status}`);
+    
+    if (resultado.status === "completed") break;
+    if (resultado.status === "error") throw new Error(`AssemblyAI erro: ${resultado.error}`);
+    tentativas++;
+  }
+
+  if (resultado.status !== "completed") throw new Error("Transcrição demorou muito");
+  
+  console.log(`Transcrição completa! ${resultado.words?.length} palavras`);
+  return resultado;
 }
 
 async function analisarMelhoresMomentos(transcricao, titulo) {
   console.log("Analisando melhores momentos com Claude...");
   
-  // Preparar texto com timestamps
-  const segmentos = transcricao.segments.map(s => 
-    `[${Math.floor(s.start)}s-${Math.floor(s.end)}s] ${s.text}`
+  // Montar texto com timestamps dos utterances
+  const texto = transcricao.text || "";
+  const palavras = transcricao.words || [];
+  
+  // Criar segmentos de 30 segundos
+  const segmentos = [];
+  let segAtual = { inicio: 0, fim: 0, texto: "" };
+  
+  palavras.forEach(p => {
+    const inicio = Math.floor(p.start / 1000);
+    const fim = Math.floor(p.end / 1000);
+    
+    if (inicio - segAtual.inicio > 30 && segAtual.texto) {
+      segmentos.push({ ...segAtual });
+      segAtual = { inicio, fim, texto: p.text + " " };
+    } else {
+      segAtual.fim = fim;
+      segAtual.texto += p.text + " ";
+    }
+  });
+  if (segAtual.texto) segmentos.push(segAtual);
+
+  const textoSegmentado = segmentos.map(s => 
+    `[${s.inicio}s-${s.fim}s] ${s.texto.trim()}`
   ).join("\n");
 
   const res = await axios.post("https://api.anthropic.com/v1/messages", {
@@ -71,28 +131,28 @@ async function analisarMelhoresMomentos(transcricao, titulo) {
     max_tokens: 1000,
     messages: [{
       role: "user",
-      content: `Você é especialista em criar cortes virais de podcast para YouTube Shorts.
+      content: `Você é especialista em criar cortes virais de podcast para YouTube Shorts brasileiros.
 
 Analise essa transcrição do vídeo "${titulo}" e escolha os 5 melhores momentos para virar Shorts virais.
 
-Critérios para escolher:
-- Momentos impactantes, engraçados ou reveladores
-- Falas que geram curiosidade ou polêmica
-- Histórias interessantes com começo, meio e fim
+Critérios:
+- Momentos impactantes, engraçados, reveladores ou polêmicos
+- Falas que geram curiosidade ou debate
+- Histórias com começo meio e fim
 - Duração ideal: 45 a 90 segundos cada
-- Evitar cortes no meio de uma frase importante
+- Não cortar no meio de raciocínio importante
 
 TRANSCRIÇÃO:
-${segmentos.slice(0, 8000)}
+${textoSegmentado.slice(0, 8000)}
 
-Retorne APENAS um JSON válido neste formato exato, sem markdown:
+Retorne APENAS JSON válido sem markdown:
 {
   "cortes": [
     {
       "inicio": 45,
       "fim": 112,
-      "titulo": "Título chamativo pra Short",
-      "descricao": "Descrição curta pra YouTube com hashtags",
+      "titulo": "Título chamativo pro Short",
+      "descricao": "Descrição com hashtags pra YouTube",
       "motivo": "Por que esse momento é viral"
     }
   ]
@@ -102,8 +162,8 @@ Retorne APENAS um JSON válido neste formato exato, sem markdown:
     headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" }
   });
 
-  const texto = res.data.content?.map(b => b.text || "").join("") || "";
-  const clean = texto.replace(/```json|```/g, "").trim();
+  const texto2 = res.data.content?.map(b => b.text || "").join("") || "";
+  const clean = texto2.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
 }
 
@@ -114,10 +174,7 @@ async function cortarVideo(videoPath, inicio, fim, index, pasta) {
   
   await rodar(
     `ffmpeg -i "${videoPath}" -ss ${inicio} -t ${duracao} ` +
-    `-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,` +
-    `drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:` +
-    `fontsize=24:fontcolor=white:x=(w-text_w)/2:y=h-80:` +
-    `text='ClipForge.app':box=1:boxcolor=black@0.4:boxborderw=6" ` +
+    `-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920" ` +
     `-c:v libx264 -c:a aac -b:a 192k -preset fast -crf 23 "${clipPath}" -y`
   );
   
@@ -128,33 +185,35 @@ app.post("/gerar-cortes", async (req, res) => {
   const jobId = uuidv4().slice(0, 8);
   const pasta = path.join(TMP, jobId);
   fs.mkdirSync(pasta, { recursive: true });
-  console.log(`[${jobId}] Iniciando pipeline de cortes...`);
+  console.log(`[${jobId}] Iniciando ClipForge...`);
 
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ erro: "URL é obrigatória" });
 
-    // 1. Pegar info do vídeo
-    console.log(`[${jobId}] Obtendo info do vídeo...`);
+    // 1. Info do vídeo
+    console.log(`[${jobId}] Obtendo info...`);
     const infoRaw = await rodar(`yt-dlp --dump-json "${url}"`);
     const info = JSON.parse(infoRaw);
     const titulo = info.title || "Vídeo";
     const duracao = info.duration || 0;
-    console.log(`[${jobId}] Título: ${titulo} | Duração: ${duracao}s`);
+    console.log(`[${jobId}] "${titulo}" | ${duracao}s`);
 
     // 2. Baixar vídeo
     const videoPath = await baixarVideo(url, pasta);
     console.log(`[${jobId}] Vídeo baixado!`);
 
-    // 3. Transcrever
-    const transcricao = await transcreverAudio(videoPath, pasta);
-    console.log(`[${jobId}] Transcrição pronta! ${transcricao.segments.length} segmentos`);
+    // 3. Extrair áudio
+    const audioPath = await extrairAudio(videoPath, pasta);
 
-    // 4. Analisar melhores momentos
+    // 4. Transcrever com AssemblyAI
+    const transcricao = await transcreverAssemblyAI(audioPath);
+
+    // 5. Analisar melhores momentos
     const analise = await analisarMelhoresMomentos(transcricao, titulo);
-    console.log(`[${jobId}] ${analise.cortes.length} melhores momentos identificados`);
+    console.log(`[${jobId}] ${analise.cortes.length} momentos identificados!`);
 
-    // 5. Cortar vídeos
+    // 6. Cortar vídeos
     const cortesFinais = [];
     for (let i = 0; i < Math.min(analise.cortes.length, 5); i++) {
       const corte = analise.cortes[i];
@@ -186,7 +245,7 @@ app.post("/gerar-cortes", async (req, res) => {
       duracaoOriginal: duracao,
       totalCortes: cortesFinais.length,
       cortes: cortesFinais,
-      mensagem: `${cortesFinais.length} cortes gerados com sucesso!`
+      mensagem: `${cortesFinais.length} cortes gerados!`
     });
 
   } catch (erro) {
@@ -196,4 +255,4 @@ app.post("/gerar-cortes", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 ClipForge API v1 rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 ClipForge API v2 rodando na porta ${PORT}`));
