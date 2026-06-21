@@ -85,9 +85,10 @@ async function gerarNarracao(texto, pasta) {
 }
 
 async function gerarClipe(prompt, index, pasta) {
+  // Usando Seedance 1 Lite - modelo testado e confiavel no Replicate
   const res = await axios.post(
-    "https://api.replicate.com/v1/models/wan-video/wan-2.5-t2v-fast/predictions",
-    { input: { prompt, num_frames: 81, frames_per_second: 16, resolution: "720p", sample_steps: 20 } },
+    "https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions",
+    { input: { prompt, duration: 5, resolution: "720p", aspect_ratio: "16:9" } },
     { headers: { "Authorization": `Bearer ${REPLICATE_KEY}`, "Content-Type": "application/json" } }
   );
 
