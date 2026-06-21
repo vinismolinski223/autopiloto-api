@@ -180,7 +180,7 @@ app.post("/gerar-video", async (req, res) => {
     console.log(`[${jobId}] Duracao do audio: ${duracaoAudio}s`);
 
     // 4. Calcular quantos clipes precisamos (1 clipe de 5s a cada 8s de video)
-    const numClipes = Math.min(Math.max(Math.ceil(duracaoAudio / 8) + 2, 8), 12);
+    const numClipes = 4; // 4 clipes de 5s em loop cobrem qualquer duracao
     console.log(`[${jobId}] Gerando ${numClipes} clipes...`);
 
     // Prompts padrao sombrios pra True Crime caso nao tenha suficientes
