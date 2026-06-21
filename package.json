@@ -1,7 +1,7 @@
 {
   "name": "clipforge-api",
-  "version": "2.0.0",
-  "description": "ClipForge - Gerador automático de cortes de podcast",
+  "version": "4.0.0",
+  "description": "ClipForge API - Gerador automático de cortes",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "axios": "^1.6.0",
     "uuid": "^9.0.0",
+    "multer": "^1.4.5-lts.1",
     "form-data": "^4.0.0"
   }
 }
