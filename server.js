@@ -102,9 +102,10 @@ async function transcreverAssemblyAI(audioPath) {
   const transcricaoRes = await axios.post("https://api.assemblyai.com/v2/transcript", {
     audio_url: uploadUrl,
     language_code: "pt",
-    timestamps_type: "word",
+    word_boost: [],
+    format_text: true,
   }, {
-    headers: { "authorization": ASSEMBLYAI_KEY }
+    headers: { "authorization": ASSEMBLYAI_KEY, "content-type": "application/json" }
   });
   
   const transcricaoId = transcricaoRes.data.id;
