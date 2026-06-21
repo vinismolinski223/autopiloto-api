@@ -5,7 +5,6 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const FormData = require("form-data");
 
 const app = express();
 app.use(cors());
@@ -20,10 +19,11 @@ const PORT = process.env.PORT || 3000;
 const TMP = "/tmp/clipforge";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
 const ASSEMBLYAI_KEY = process.env.ASSEMBLYAI_KEY;
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
 
-app.get("/status", (req, res) => res.json({ status: "online", version: "2.0.0" }));
+app.get("/status", (req, res) => res.json({ status: "online", version: "3.0.0" }));
 
 function rodar(comando) {
   return new Promise((resolve, reject) => {
@@ -34,15 +34,47 @@ function rodar(comando) {
   });
 }
 
-async function baixarVideo(url, pasta) {
-  console.log(`Baixando vídeo: ${url}`);
-  const videoPath = path.join(pasta, "video.mp4");
+async function obterLinkVideo(url) {
+  console.log(`Obtendo link via YTStream: ${url}`);
   
-  // Usar cookies do arquivo no repositório
-  const cookiesPath = path.join(__dirname, "cookies.txt");
-  const cookiesFlag = fs.existsSync(cookiesPath) ? `--cookies "${cookiesPath}"` : "";
-  if (cookiesFlag) console.log("Usando cookies do YouTube!");
-  await rodar(`yt-dlp ${cookiesFlag} --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -f "bestvideo[height<=720]+bestaudio/best[height<=720]" --merge-output-format mp4 -o "${videoPath}" "${url}"`);
+  // Extrair ID do vídeo
+  const match = url.match(/(?:v=|youtu\.be\/)([^&\n?#]+)/);
+  if (!match) throw new Error("URL do YouTube inválida");
+  const videoId = match[1];
+  
+  const res = await axios.get("https://ytstream-download-youtube-videos.p.rapidapi.com/dl", {
+    params: { id: videoId },
+    headers: {
+      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-host": "ytstream-download-youtube-videos.p.rapidapi.com"
+    }
+  });
+
+  const data = res.data;
+  console.log(`Título: ${data.title}`);
+  
+  // Pegar melhor formato de vídeo disponível (720p ou menor)
+  const formatos = data.formats || [];
+  const formato = formatos.find(f => f.qualityLabel === "720p") ||
+                  formatos.find(f => f.qualityLabel === "480p") ||
+                  formatos.find(f => f.qualityLabel === "360p") ||
+                  formatos[0];
+
+  if (!formato || !formato.url) throw new Error("Nenhum formato de vídeo disponível");
+  
+  console.log(`Formato: ${formato.qualityLabel}`);
+  return { 
+    videoUrl: formato.url, 
+    titulo: data.title, 
+    duracao: data.lengthSeconds,
+    videoId
+  };
+}
+
+async function baixarVideo(videoUrl, pasta) {
+  console.log("Baixando vídeo via link direto...");
+  const videoPath = path.join(pasta, "video.mp4");
+  await rodar(`ffmpeg -i "${videoUrl}" -c copy "${videoPath}" -y`);
   return videoPath;
 }
 
@@ -56,7 +88,6 @@ async function extrairAudio(videoPath, pasta) {
 async function transcreverAssemblyAI(audioPath) {
   console.log("Enviando áudio pro AssemblyAI...");
   
-  // Upload do arquivo
   const audioData = fs.readFileSync(audioPath);
   const uploadRes = await axios.post("https://api.assemblyai.com/v2/upload", audioData, {
     headers: {
@@ -66,9 +97,8 @@ async function transcreverAssemblyAI(audioPath) {
     maxBodyLength: Infinity,
   });
   const uploadUrl = uploadRes.data.upload_url;
-  console.log("Áudio enviado! Iniciando transcrição...");
+  console.log("Áudio enviado! Transcrevendo...");
 
-  // Iniciar transcrição
   const transcricaoRes = await axios.post("https://api.assemblyai.com/v2/transcript", {
     audio_url: uploadUrl,
     language_code: "pt",
@@ -78,9 +108,7 @@ async function transcreverAssemblyAI(audioPath) {
   });
   
   const transcricaoId = transcricaoRes.data.id;
-  console.log(`Transcrição iniciada: ${transcricaoId}`);
 
-  // Polling até completar
   let resultado;
   let tentativas = 0;
   while (tentativas < 120) {
@@ -89,34 +117,27 @@ async function transcreverAssemblyAI(audioPath) {
       headers: { "authorization": ASSEMBLYAI_KEY }
     });
     resultado = statusRes.data;
-    console.log(`Transcrição status: ${resultado.status}`);
-    
+    console.log(`Transcrição: ${resultado.status}`);
     if (resultado.status === "completed") break;
     if (resultado.status === "error") throw new Error(`AssemblyAI erro: ${resultado.error}`);
     tentativas++;
   }
 
   if (resultado.status !== "completed") throw new Error("Transcrição demorou muito");
-  
   console.log(`Transcrição completa! ${resultado.words?.length} palavras`);
   return resultado;
 }
 
 async function analisarMelhoresMomentos(transcricao, titulo) {
-  console.log("Analisando melhores momentos com Claude...");
+  console.log("Analisando com Claude...");
   
-  // Montar texto com timestamps dos utterances
-  const texto = transcricao.text || "";
   const palavras = transcricao.words || [];
-  
-  // Criar segmentos de 30 segundos
   const segmentos = [];
   let segAtual = { inicio: 0, fim: 0, texto: "" };
   
   palavras.forEach(p => {
     const inicio = Math.floor(p.start / 1000);
     const fim = Math.floor(p.end / 1000);
-    
     if (inicio - segAtual.inicio > 30 && segAtual.texto) {
       segmentos.push({ ...segAtual });
       segAtual = { inicio, fim, texto: p.text + " " };
@@ -127,7 +148,7 @@ async function analisarMelhoresMomentos(transcricao, titulo) {
   });
   if (segAtual.texto) segmentos.push(segAtual);
 
-  const textoSegmentado = segmentos.map(s => 
+  const textoSegmentado = segmentos.map(s =>
     `[${s.inicio}s-${s.fim}s] ${s.texto.trim()}`
   ).join("\n");
 
@@ -145,7 +166,6 @@ Critérios:
 - Falas que geram curiosidade ou debate
 - Histórias com começo meio e fim
 - Duração ideal: 45 a 90 segundos cada
-- Não cortar no meio de raciocínio importante
 
 TRANSCRIÇÃO:
 ${textoSegmentado.slice(0, 8000)}
@@ -167,8 +187,8 @@ Retorne APENAS JSON válido sem markdown:
     headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" }
   });
 
-  const texto2 = res.data.content?.map(b => b.text || "").join("") || "";
-  const clean = texto2.replace(/```json|```/g, "").trim();
+  const texto = res.data.content?.map(b => b.text || "").join("") || "";
+  const clean = texto.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
 }
 
@@ -190,28 +210,24 @@ app.post("/gerar-cortes", async (req, res) => {
   const jobId = uuidv4().slice(0, 8);
   const pasta = path.join(TMP, jobId);
   fs.mkdirSync(pasta, { recursive: true });
-  console.log(`[${jobId}] Iniciando ClipForge...`);
+  console.log(`[${jobId}] Iniciando ClipForge v3...`);
 
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ erro: "URL é obrigatória" });
 
-    // 1. Info do vídeo
-    console.log(`[${jobId}] Obtendo info...`);
-    const infoRaw = await rodar(`yt-dlp --dump-json "${url}"`);
-    const info = JSON.parse(infoRaw);
-    const titulo = info.title || "Vídeo";
-    const duracao = info.duration || 0;
-    console.log(`[${jobId}] "${titulo}" | ${duracao}s`);
+    // 1. Obter link direto via YTStream
+    const { videoUrl, titulo, duracao } = await obterLinkVideo(url);
+    console.log(`[${jobId}] Link obtido! "${titulo}" ${duracao}s`);
 
     // 2. Baixar vídeo
-    const videoPath = await baixarVideo(url, pasta);
+    const videoPath = await baixarVideo(videoUrl, pasta);
     console.log(`[${jobId}] Vídeo baixado!`);
 
     // 3. Extrair áudio
     const audioPath = await extrairAudio(videoPath, pasta);
 
-    // 4. Transcrever com AssemblyAI
+    // 4. Transcrever
     const transcricao = await transcreverAssemblyAI(audioPath);
 
     // 5. Analisar melhores momentos
@@ -260,4 +276,4 @@ app.post("/gerar-cortes", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 ClipForge API v2 rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 ClipForge API v3 rodando na porta ${PORT}`));
