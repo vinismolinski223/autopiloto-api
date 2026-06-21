@@ -10,7 +10,13 @@ const { v4: uuidv4 } = require("uuid");
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) res.setHeader("Content-Type", "text/html; charset=utf-8");
+    if (filePath.endsWith(".css")) res.setHeader("Content-Type", "text/css");
+    if (filePath.endsWith(".js")) res.setHeader("Content-Type", "application/javascript");
+  }
+}));
 
 const PORT = process.env.PORT || 3000;
 const TMP = "/tmp/autopiloto";
