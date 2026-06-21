@@ -86,23 +86,26 @@ async function gerarNarracao(texto, pasta) {
 
 async function gerarClipe(prompt, index, pasta) {
   const res = await axios.post(
-    "https://api.replicate.com/v1/models/kwaivgi/kling-v3-video/predictions",
-    { input: { prompt, duration: 5, aspect_ratio: "16:9", cfg_scale: 0.5 } },
-    { headers: { "Authorization": `Bearer ${REPLICATE_KEY}`, "Content-Type": "application/json", "Prefer": "wait=60" } }
+    "https://api.replicate.com/v1/models/wan-video/wan-2.5-t2v-fast/predictions",
+    { input: { prompt, num_frames: 81, frames_per_second: 16, resolution: "720p", sample_steps: 20 } },
+    { headers: { "Authorization": `Bearer ${REPLICATE_KEY}`, "Content-Type": "application/json" } }
   );
 
   let prediction = res.data;
+  if (prediction.error) throw new Error(prediction.error);
+
   let tentativas = 0;
-  while (prediction.status !== "succeeded" && prediction.status !== "failed" && tentativas < 30) {
+  while (prediction.status !== "succeeded" && prediction.status !== "failed" && tentativas < 40) {
     await new Promise(r => setTimeout(r, 5000));
     const poll = await axios.get(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
       headers: { "Authorization": `Bearer ${REPLICATE_KEY}` }
     });
     prediction = poll.data;
     tentativas++;
+    console.log(`Clipe ${index + 1} status: ${prediction.status}`);
   }
 
-  if (prediction.status !== "succeeded") throw new Error(`Clipe ${index + 1} falhou`);
+  if (prediction.status !== "succeeded") throw new Error(`Clipe ${index + 1} falhou: ${prediction.error || prediction.status}`);
 
   const clipUrl = prediction.output?.[0] || prediction.output;
   const clipPath = path.join(pasta, `clip_${index}.mp4`);
