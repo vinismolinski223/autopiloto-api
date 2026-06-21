@@ -37,7 +37,12 @@ function rodar(comando) {
 async function baixarVideo(url, pasta) {
   console.log(`Baixando vídeo: ${url}`);
   const videoPath = path.join(pasta, "video.mp4");
-  await rodar(`yt-dlp -f "bestvideo[height<=720]+bestaudio/best[height<=720]" --merge-output-format mp4 -o "${videoPath}" "${url}"`);
+  
+  // Usar cookies do arquivo no repositório
+  const cookiesPath = path.join(__dirname, "cookies.txt");
+  const cookiesFlag = fs.existsSync(cookiesPath) ? `--cookies "${cookiesPath}"` : "";
+  if (cookiesFlag) console.log("Usando cookies do YouTube!");
+  await rodar(`yt-dlp ${cookiesFlag} --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -f "bestvideo[height<=720]+bestaudio/best[height<=720]" --merge-output-format mp4 -o "${videoPath}" "${url}"`);
   return videoPath;
 }
 
