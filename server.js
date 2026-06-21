@@ -109,7 +109,18 @@ async function gerarClipe(prompt, index, pasta) {
 
   if (prediction.status !== "succeeded") throw new Error(`Clipe ${index + 1} falhou. Status: ${prediction.status}. Erro: ${JSON.stringify(prediction.error)}`);
 
-  const clipUrl = prediction.output?.[0] || prediction.output;
+  // Seedance pode retornar output como string direta ou array
+  let clipUrl = null;
+  if (typeof prediction.output === "string") clipUrl = prediction.output;
+  else if (Array.isArray(prediction.output)) clipUrl = prediction.output[0];
+  else if (prediction.output?.url) clipUrl = prediction.output.url;
+  
+  console.log(`Clipe ${index + 1} output:`, JSON.stringify(prediction.output));
+  
+  if (!clipUrl || clipUrl === "null" || clipUrl === "undefined") {
+    throw new Error(`Clipe ${index + 1} retornou URL inválida: ${JSON.stringify(prediction.output)}`);
+  }
+
   const clipPath = path.join(pasta, `clip_${index}.mp4`);
   await baixarArquivo(clipUrl, clipPath);
   return clipPath;
