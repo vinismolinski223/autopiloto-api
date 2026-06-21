@@ -72,9 +72,24 @@ async function obterLinkVideo(url) {
 }
 
 async function baixarVideo(videoUrl, pasta) {
-  console.log("Baixando vídeo via link direto...");
+  console.log("Baixando vídeo via axios...");
   const videoPath = path.join(pasta, "video.mp4");
-  await rodar(`ffmpeg -i "${videoUrl}" -c copy "${videoPath}" -y`);
+  
+  const response = await axios({
+    method: "GET",
+    url: videoUrl,
+    responseType: "arraybuffer",
+    timeout: 300000,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Referer": "https://www.youtube.com/",
+    }
+  });
+  
+  fs.writeFileSync(videoPath, Buffer.from(response.data));
+  console.log("Vídeo baixado com sucesso!");
   return videoPath;
 }
 
